@@ -17,6 +17,7 @@
             background: black;
         }
 
+        /* Container full màn, căn giữa theo trục ngang, đẩy canvas sát mép trên */
         #unity-container {
             position: fixed;
             top: 0;
@@ -26,13 +27,14 @@
             overflow: hidden;
             background: black;
             display: flex;
-            justify-content: center;
-            align-items: center;
+            justify-content: center; /* canh giữa theo chiều ngang */
+            align-items: flex-start; /* ĐẨY canvas lên trên, không bị lệch xuống */
         }
 
         #unity-canvas {
             display: block;
             background: black;
+            margin-top: 0 !important; /* đảm bảo không có margin trên */
         }
     </style>
 </head>
@@ -52,6 +54,7 @@
             <div id="unity-build-title">Danger Dungeon Dungeon Master</div>
         </div>
     </div>
+
     <script>
         var container = document.querySelector("#unity-container");
         var canvas = document.querySelector("#unity-canvas");
@@ -66,7 +69,7 @@
                 if (!warningBanner) return;
                 warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
             }
-            if (!warningBanner) return; // bám sát target: không tạo thêm DOM mới
+            if (!warningBanner) return;
             var div = document.createElement('div');
             div.innerHTML = msg;
             warningBanner.appendChild(div);
@@ -127,7 +130,7 @@
             document.getElementsByTagName('head')[0].appendChild(meta);
             container.className = "unity-mobile";
             canvas.className = "unity-mobile";
-            // config.devicePixelRatio = 1; // giữ nguyên như target (comment)
+            // config.devicePixelRatio = 1;
         }
 
         var script = document.createElement("script");
