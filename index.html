@@ -4,46 +4,37 @@
     <script src="https://telegram.org/js/telegram-web-app.js?56"></script>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Unity Web Player | Danger Dungeon Dungeon Master</title>
+    <title>Unity WebGL Player | SkybullBaseTemplate</title>
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
     <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes">
     <style>
-                html, body {
-                        margin: 0;
-                        padding: 0;
-                        overflow: hidden;
-                        height: 100%;
-                        width: 100%;
-                        background: black;
-
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            height: 100%;
+            width: 100%;
+            background: black;
         }
 
-
-        /* Container full màn, căn giữa theo cả 2 trục */
-                #unity-container {
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        width: 100vw;
-                        height: 100vh;
-                        overflow: hidden;
-                        background: black;
-                        display: flex;
-                        justify-content: center; /* canh giữa theo chiều ngang */
-                        align-items: center; /* canh giữa theo chiều dọc (khác với align-items: flex-start ở file gốc) */
-
+        #unity-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
-                #unity-canvas {
-                        display: block;
-                        background: black;
-
-            /* Loại bỏ margin-top: 0 !important; của file gốc để canh giữa */
-
+        #unity-canvas {
+            display: block;
+            background: black;
         }
-
-
     </style>
 </head>
 <body>
@@ -55,15 +46,15 @@
                 <div id="unity-progress-bar-full"></div>
             </div>
         </div>
-        <div id="unity-warning"> </div>
-        <div id="unity-footer">
-            <div id="unity-logo-title-footer"></div>
-            <div id="unity-fullscreen-button"></div>
-            <div id="unity-build-title">Danger Dungeon Dungeon Master</div>
-        </div>
     </div>
 
     <script>
+        // Telegram WebApp
+        if (window.Telegram && Telegram.WebApp) {
+            Telegram.WebApp.ready();
+            try { Telegram.WebApp.expand(); } catch (e) { }
+        }
+
         var container = document.querySelector("#unity-container");
         var canvas = document.querySelector("#unity-canvas");
         var loadingBar = document.querySelector("#unity-loading-bar");
@@ -77,7 +68,7 @@
                 if (!warningBanner) return;
                 warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
             }
-            if (!warningBanner) return;
+            if (!warningBanner) return; // bám sát target: không tạo thêm DOM mới
             var div = document.createElement('div');
             div.innerHTML = msg;
             warningBanner.appendChild(div);
@@ -104,6 +95,12 @@
             productName: "Danger Dungeon Dungeon Master",
             productVersion: "0.0.3",
             showBanner: unityShowBanner,
+            // errorHandler: function(err, url, line) {
+            //    alert("error " + err + " occurred at line " + line);
+            //    // Return 'true' if you handled this error and don't want Unity
+            //    // to process it further, 'false' otherwise.
+            //    return true;
+            // },
         };
 
         function maintainAspectRatio() {
@@ -132,9 +129,13 @@
         document.querySelector("#unity-loading-bar").style.display = "block";
 
         if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+            var meta = document.createElement('meta');
+            meta.name = 'viewport';
+            meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+            document.getElementsByTagName('head')[0].appendChild(meta);
             container.className = "unity-mobile";
             canvas.className = "unity-mobile";
-            // config.devicePixelRatio = 1; // Giữ nguyên như target (comment/loại bỏ nếu không cần thiết)
+            // config.devicePixelRatio = 1; // giữ nguyên như target (comment)
         }
 
         var script = document.createElement("script");
