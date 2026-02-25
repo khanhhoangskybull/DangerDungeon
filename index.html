@@ -33,7 +33,48 @@
 
         #unity-canvas {
             display: block;
-            background: black;
+            background: url("/TemplateData/Background.png") center center / cover no-repeat;
+        }
+
+        #unity-loading-bar {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            width: 80%;
+            max-width: 360px;
+            z-index: 999;
+        }
+
+        #unity-progress-bar-empty {
+            width: 100% !important;
+            height: 12px !important;
+            background: rgba(255, 255, 255, 0.2) !important;
+            border-radius: 999px !important;
+            overflow: hidden !important;
+            margin: 0 !important;
+        }
+
+        #unity-progress-bar-full {
+            width: 0%;
+            height: 100% !important;
+            background: linear-gradient(90deg, #a78bfa, #60a5fa) !important;
+            border-radius: 999px !important;
+            transition: width 0.2s ease;
+            margin: 0 !important;
+        }
+
+        #unity-load-text {
+            color: rgba(255, 255, 255, 0.9);
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            font-size: 15px;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.5);
         }
     </style>
 </head>
@@ -41,7 +82,7 @@
     <div id="unity-container" class="unity-desktop">
         <canvas id="unity-canvas" width="1080" height="1920" tabindex="1"></canvas>
         <div id="unity-loading-bar">
-            <div id="unity-logo"></div>
+            <div id="unity-load-text">Loading... 0%</div>
             <div id="unity-progress-bar-empty">
                 <div id="unity-progress-bar-full"></div>
             </div>
@@ -126,7 +167,7 @@
         window.addEventListener("resize", maintainAspectRatio);
         window.addEventListener("load", maintainAspectRatio);
 
-        document.querySelector("#unity-loading-bar").style.display = "block";
+        document.querySelector("#unity-loading-bar").style.display = "flex";
 
         if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
             var meta = document.createElement('meta');
@@ -138,11 +179,122 @@
             // config.devicePixelRatio = 1; // giữ nguyên như target (comment)
         }
 
+        var loadText = document.querySelector("#unity-load-text");
+
+        // --- Download Interceptor (XHR + fetch) ---
+        var _dlLoaded = 0;
+        var _dlTotal = 0;
+        var _dlStartTime = null;
+        var _dlRequestMap = {};
+        var _dlCounter = 0;
+
+        var _dlDone = false;
+
+        function _dlCheckDone() {
+            if (!_dlDone && _dlTotal > 0 && _dlLoaded >= _dlTotal) {
+                _dlDone = true;
+                if (loadText) loadText.textContent = 'Đang giải nén dữ liệu...';
+            }
+        }
+
+        function _dlUpdateText() {
+            if (_dlDone) return;
+            var elapsed = (Date.now() - _dlStartTime) / 1000;
+            var speedKBs = elapsed > 0 ? (_dlLoaded / 1024 / elapsed) : 0;
+            var loadedMB = (_dlLoaded / 1048576).toFixed(1);
+            var totalMB  = (_dlTotal  / 1048576).toFixed(1);
+            var speedStr = speedKBs >= 1024
+                ? (speedKBs / 1024).toFixed(1) + ' MB/s'
+                : Math.round(speedKBs) + ' KB/s';
+            if (loadText) loadText.textContent = loadedMB + ' / ' + totalMB + ' MB  ·  ' + speedStr;
+            _dlCheckDone();
+        }
+
+        console.log('[DL] interceptor installing...');
+
+        // --- Patch XHR ---
+        (function () {
+            var origOpen = XMLHttpRequest.prototype.open;
+            var origSend = XMLHttpRequest.prototype.send;
+            XMLHttpRequest.prototype.open = function (method, url) {
+                this._dlId = ++_dlCounter;
+                console.log('[DL] XHR open #' + this._dlId, url);
+                return origOpen.apply(this, arguments);
+            };
+            XMLHttpRequest.prototype.send = function () {
+                var xhr = this;
+                console.log('[DL] XHR send #' + xhr._dlId);
+                xhr.addEventListener('progress', function (e) {
+                    console.log('[DL] XHR progress #' + xhr._dlId, e.loaded, '/', e.total, 'computable:', e.lengthComputable);
+                    if (!e.lengthComputable) return;
+                    if (!_dlStartTime) _dlStartTime = Date.now();
+                    var id = xhr._dlId;
+                    if (!_dlRequestMap[id]) { _dlRequestMap[id] = { loaded: 0 }; _dlTotal += e.total; }
+                    _dlLoaded += (e.loaded - _dlRequestMap[id].loaded);
+                    _dlRequestMap[id].loaded = e.loaded;
+                    _dlUpdateText();
+                });
+                return origSend.apply(this, arguments);
+            };
+        })();
+
+        // --- Patch fetch ---
+        (function () {
+            var origFetch = window.fetch;
+            window.fetch = function (input, init) {
+                var url = (typeof input === 'string') ? input : (input && input.url) || '';
+                console.log('[DL] fetch ->', url);
+                return origFetch.apply(this, arguments).then(function (response) {
+                    var contentLength = response.headers.get('content-length');
+                    var total = contentLength ? parseInt(contentLength, 10) : 0;
+                    console.log('[DL] fetch response', url, 'content-length:', contentLength);
+                    if (!total) return response; // cannot track without size
+                    if (!_dlStartTime) _dlStartTime = Date.now();
+                    _dlTotal += total;
+                    var id = ++_dlCounter;
+                    _dlRequestMap[id] = { loaded: 0 };
+                    var reader = response.body.getReader();
+                    var stream = new ReadableStream({
+                        start: function (controller) {
+                            function pump() {
+                                return reader.read().then(function (result) {
+                                    if (result.done) { controller.close(); return; }
+                                    var chunk = result.value;
+                                    _dlLoaded += chunk.byteLength;
+                                    _dlRequestMap[id].loaded += chunk.byteLength;
+                                    console.log('[DL] fetch chunk', chunk.byteLength, 'total loaded:', _dlLoaded);
+                                    _dlUpdateText();
+                                    controller.enqueue(chunk);
+                                    return pump();
+                                });
+                            }
+                            return pump();
+                        }
+                    });
+                    return new Response(stream, {
+                        headers: response.headers,
+                        status: response.status,
+                        statusText: response.statusText
+                    });
+                });
+            };
+        })();
+
+        console.log('[DL] interceptor installed. XHR patched:', XMLHttpRequest.prototype.open !== undefined, '| fetch patched:', window.fetch !== undefined);
+        // ------------------------------------------
+
         var script = document.createElement("script");
         script.src = loaderUrl;
+
         script.onload = () => {
             createUnityInstance(canvas, config, (progress) => {
-                progressBarFull.style.width = 100 * progress + "%";
+                progressBarFull.style.width = (100 * progress) + "%";
+                // Nếu file tải xong nhưng interceptor không bắt được (server không trả Content-Length)
+                // thì dùng progress >= 0.9 để chuyển sang trạng thái giải nén
+                if (!_dlDone && progress >= 0.9) {
+                    _dlDone = true;
+                    if (loadText) loadText.textContent = 'Extracting data...';
+                }
             }).then((unityInstance) => {
                 loadingBar.style.display = "none";
                 Gameinstance = unityInstance;
@@ -152,6 +304,8 @@
             });
         };
         document.body.appendChild(script);
+
+
     </script>
 
     <script>
