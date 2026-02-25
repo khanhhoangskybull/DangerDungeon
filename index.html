@@ -38,22 +38,22 @@
 
         #unity-loading-bar {
             position: fixed;
-            bottom: 40px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
             width: 80%;
             max-width: 360px;
+            display: none;
+            flex-direction: column-reverse;
+            align-items: bottom;
+            gap: 6px;
             z-index: 999;
         }
 
         #unity-progress-bar-empty {
             width: 100% !important;
-            height: 12px !important;
-            background: rgba(255, 255, 255, 0.2) !important;
+            height: 8px !important;
+            background: rgba(255, 255, 255, 0.15) !important;
             border-radius: 999px !important;
             overflow: hidden !important;
             margin: 0 !important;
@@ -69,18 +69,21 @@
         }
 
         #unity-load-text {
-            color: rgba(255, 255, 255, 0.9);
+            color: rgba(255, 255, 255, 0.75);
             font-family: 'Inter', 'Segoe UI', sans-serif;
-            font-size: 15px;
-            font-weight: 500;
-            letter-spacing: 0.05em;
-            text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+            font-size: 11px;
+            font-weight: 400;
+            letter-spacing: 0.04em;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+            text-align: center;
         }
     </style>
 </head>
 <body>
     <div id="unity-container" class="unity-desktop">
-        <canvas id="unity-canvas" width="1080" height="1920" tabindex="1"></canvas>
+        <canvas id="unity-canvas" width="1080" height="1920" tabindex="1">
+            
+        </canvas>
         <div id="unity-loading-bar">
             <div id="unity-load-text">Loading... 0%</div>
             <div id="unity-progress-bar-empty">
@@ -193,7 +196,7 @@
         function _dlCheckDone() {
             if (!_dlDone && _dlTotal > 0 && _dlLoaded >= _dlTotal) {
                 _dlDone = true;
-                if (loadText) loadText.textContent = 'Đang giải nén dữ liệu...';
+                if (loadText) loadText.textContent = 'Extracting data...';
             }
         }
 
@@ -204,13 +207,16 @@
             var loadedMB = (_dlLoaded / 1048576).toFixed(1);
             var totalMB  = (_dlTotal  / 1048576).toFixed(1);
             var speedStr = speedKBs >= 1024
-                ? (speedKBs / 1024).toFixed(1) + ' MB/s'
+                ? (speedKBs / 1024).toFixed(2) + ' MB/s'
                 : Math.round(speedKBs) + ' KB/s';
-            if (loadText) loadText.textContent = loadedMB + ' / ' + totalMB + ' MB  ·  ' + speedStr;
+            
+            if (loadText) {
+                loadText.textContent = 'Loading resources... ' + loadedMB + 'MB/' + totalMB + 'MB - ' + speedStr;
+            }
             _dlCheckDone();
         }
 
-        console.log('[DL] interceptor installing...');
+        console.log('[DL] interceptor installed.');
 
         // --- Patch XHR ---
         (function () {
@@ -218,14 +224,11 @@
             var origSend = XMLHttpRequest.prototype.send;
             XMLHttpRequest.prototype.open = function (method, url) {
                 this._dlId = ++_dlCounter;
-                console.log('[DL] XHR open #' + this._dlId, url);
                 return origOpen.apply(this, arguments);
             };
             XMLHttpRequest.prototype.send = function () {
                 var xhr = this;
-                console.log('[DL] XHR send #' + xhr._dlId);
                 xhr.addEventListener('progress', function (e) {
-                    console.log('[DL] XHR progress #' + xhr._dlId, e.loaded, '/', e.total, 'computable:', e.lengthComputable);
                     if (!e.lengthComputable) return;
                     if (!_dlStartTime) _dlStartTime = Date.now();
                     var id = xhr._dlId;
@@ -243,12 +246,10 @@
             var origFetch = window.fetch;
             window.fetch = function (input, init) {
                 var url = (typeof input === 'string') ? input : (input && input.url) || '';
-                console.log('[DL] fetch ->', url);
                 return origFetch.apply(this, arguments).then(function (response) {
                     var contentLength = response.headers.get('content-length');
                     var total = contentLength ? parseInt(contentLength, 10) : 0;
-                    console.log('[DL] fetch response', url, 'content-length:', contentLength);
-                    if (!total) return response; // cannot track without size
+                    if (!total) return response; 
                     if (!_dlStartTime) _dlStartTime = Date.now();
                     _dlTotal += total;
                     var id = ++_dlCounter;
@@ -262,7 +263,6 @@
                                     var chunk = result.value;
                                     _dlLoaded += chunk.byteLength;
                                     _dlRequestMap[id].loaded += chunk.byteLength;
-                                    console.log('[DL] fetch chunk', chunk.byteLength, 'total loaded:', _dlLoaded);
                                     _dlUpdateText();
                                     controller.enqueue(chunk);
                                     return pump();
@@ -280,7 +280,7 @@
             };
         })();
 
-        console.log('[DL] interceptor installed. XHR patched:', XMLHttpRequest.prototype.open !== undefined, '| fetch patched:', window.fetch !== undefined);
+
         // ------------------------------------------
 
         var script = document.createElement("script");
