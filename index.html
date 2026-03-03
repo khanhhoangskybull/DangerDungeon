@@ -76,6 +76,23 @@
             letter-spacing: 0.04em;
             text-shadow: 0 1px 3px rgba(0,0,0,0.6);
             text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .spinner {
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -85,7 +102,10 @@
             
         </canvas>
         <div id="unity-loading-bar">
-            <div id="unity-load-text">Loading... 0%</div>
+            <div id="unity-load-text">
+                <span id="load-text-content">Loading... 0%</span>
+                <span class="spinner"></span>
+            </div>
             <div id="unity-progress-bar-empty">
                 <div id="unity-progress-bar-full"></div>
             </div>
@@ -196,7 +216,8 @@
         function _dlCheckDone() {
             if (!_dlDone && _dlTotal > 0 && _dlLoaded >= _dlTotal) {
                 _dlDone = true;
-                if (loadText) loadText.textContent = 'Extracting data...';
+                var textSpan = document.querySelector("#load-text-content");
+                if (textSpan) textSpan.textContent = 'Extracting data...';
             }
         }
 
@@ -210,8 +231,9 @@
                 ? (speedKBs / 1024).toFixed(2) + ' MB/s'
                 : Math.round(speedKBs) + ' KB/s';
             
-            if (loadText) {
-                loadText.textContent = 'Loading resources... ' + loadedMB + 'MB/' + totalMB + 'MB - ' + speedStr;
+            var textSpan = document.querySelector("#load-text-content");
+            if (textSpan) {
+                textSpan.textContent = 'Loading resources... ' + loadedMB + 'MB/' + totalMB + 'MB - ' + speedStr;
             }
             _dlCheckDone();
         }
@@ -293,7 +315,8 @@
                 // thì dùng progress >= 0.9 để chuyển sang trạng thái giải nén
                 if (!_dlDone && progress >= 0.9) {
                     _dlDone = true;
-                    if (loadText) loadText.textContent = 'Extracting data...';
+                    var textSpan = document.querySelector("#load-text-content");
+                    if (textSpan) textSpan.textContent = 'Extracting data...';
                 }
             }).then((unityInstance) => {
                 loadingBar.style.display = "none";
